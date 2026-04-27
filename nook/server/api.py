@@ -66,6 +66,7 @@ async def deploy_app(file: UploadFile = File(...), config_str: str = Form(...)):
         container = docker_client.containers.run(
             image=f"{config.app_name}:latest",
             name=config.app_name,
+            labels={"managed_by": "nook"},
             detach=True,
             environment=config.env_vars,
             ports={f'{config.app_port}/tcp': host_port}, 
@@ -73,14 +74,12 @@ async def deploy_app(file: UploadFile = File(...), config_str: str = Form(...)):
         )
 
         try:
-            # 1. Update Nginx for HTTP
             update_nginx_config(
                 app_name=config.app_name, 
                 subdomain=config.subdomain, 
                 host_port=host_port
             )
             
-            # 2. Upgrade to HTTPS
             from nook.server.router import provision_ssl
             provision_ssl(config.subdomain)
 
@@ -101,6 +100,49 @@ async def deploy_app(file: UploadFile = File(...), config_str: str = Form(...)):
         "url": full_url,
         "message": "App is live with SSL encryption!"
     }
+
+
+@app.get("/apps", dependencies=[Depends(verify_token)])
+async def list_apps():
+    containers = docker_client.containers.list(all=True, filters={"label": "managed_by=nook"})
+    return [
+        {
+            "name": c.name,
+            "status": c.status,
+            "id": c.short_id,
+            "ports": c.ports
+        } for c in containers
+    ]
+
+@app.post("/apps/{name}/{action}", dependencies=[Depends(verify_token)])
+async def manage_app(name: str, action: str):
+    try:
+        container = docker_client.containers.get(name)
+        if action == "start":
+            container.start()
+        elif action == "stop":
+            container.stop()
+        elif action == "pause":
+            container.pause()
+        elif action == "unpause":
+            container.unpause()
+        else:
+            raise HTTPException(status_code=400, detail="Invalid action")
+        return {"status": "success", "message": f"App {name} {action}ed."}
+    except docker.errors.NotFound:
+        raise HTTPException(status_code=404, detail="App not found")
+
+@app.delete("/apps/{name}", dependencies=[Depends(verify_token)])
+async def delete_app(name: str):
+    from nook.server.router import remove_nginx_config
+    try:
+        container = docker_client.containers.get(name)
+        container.stop()
+        container.remove()
+        remove_nginx_config(name)
+        return {"status": "success", "message": f"App {name} removed completely."}
+    except docker.errors.NotFound:
+        raise HTTPException(status_code=404, detail="App not found")
 
 def start_daemon(domain: str, port: int = 8000):
     initialize_server(domain = domain)

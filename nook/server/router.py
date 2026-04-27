@@ -51,10 +51,12 @@ def update_nginx_config(app_name: str, subdomain: str, host_port: int):
         print(f"Failed to reload Nginx: {e}")
 
 def remove_nginx_config(app_name: str):
+    """Deletes the Nginx config file and reloads."""
     config_path = os.path.join(NGINX_CONF_DIR, f"{app_name}.conf")
     if os.path.exists(config_path):
         os.remove(config_path)
         subprocess.run(["sudo", "nginx", "-s", "reload"], check=True)
+        print(f"Removed Nginx config for {app_name}")
 
 def provision_ssl(subdomain: str):
     config = get_server_config()
