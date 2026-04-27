@@ -1,0 +1,12 @@
+[project]
+name = "nook"
+version = "0.0.1"
+description = "A self-hosted and open-source mini-paas."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.136.1",
+    "pydantic>=2.13.3",
+    "python-multipart>=0.0.26",
+    "uvicorn>=0.46.0",
+]
