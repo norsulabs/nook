@@ -3,6 +3,7 @@ import subprocess
 import typer
 from nook.server.config import get_server_config
 
+
 NGINX_CONF_DIR = "/etc/nginx/conf.d"
 
 NGINX_TEMPLATE = """
@@ -54,3 +55,35 @@ def remove_nginx_config(app_name: str):
     if os.path.exists(config_path):
         os.remove(config_path)
         subprocess.run(["sudo", "nginx", "-s", "reload"], check=True)
+
+def provision_ssl(subdomain: str):
+    config = get_server_config()
+    if not config:
+        return
+    
+    base_domain = config["base_domain"]
+    full_domain = f"{subdomain}.{base_domain}"
+
+    print(f"Provisioning SSL certificate for {full_domain}...")
+    
+    command = [
+        "sudo", "certbot", "--nginx",
+        "-d", full_domain,
+        "--non-interactive",
+        "--agree-tos",
+        "--register-unsafely-without-email",
+        "--redirect"
+    ]
+
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, timeout=120)
+        
+        if result.returncode == 0:
+            print(f"SSL successfully provisioned for {full_domain}")
+        else:
+            print(f"Certbot failed: {result.stderr}")
+            
+    except subprocess.TimeoutExpired:
+        print("SSL Provisioning timed out. Check your DNS propagation.")
+    except Exception as e:
+        print(f"Unexpected error during SSL setup: {e}")

@@ -73,27 +73,33 @@ async def deploy_app(file: UploadFile = File(...), config_str: str = Form(...)):
         )
 
         try:
+            # 1. Update Nginx for HTTP
             update_nginx_config(
                 app_name=config.app_name, 
                 subdomain=config.subdomain, 
                 host_port=host_port
             )
+            
+            # 2. Upgrade to HTTPS
+            from nook.server.router import provision_ssl
+            provision_ssl(config.subdomain)
+
         except Exception as e:
             return {
                 "status": "partial_success",
                 "host_port": host_port,
-                "message": f"App is running on port {host_port}, but Nginx routing failed: {str(e)}"
+                "message": f"App is running on port {host_port}, but Nginx routing or SSL failed: {str(e)}"
             }
             
     config_obj = get_server_config()
-    full_url = f"http://{config.subdomain}.{config_obj['base_domain']}"
+    full_url = f"https://{config.subdomain}.{config_obj['base_domain']}"
 
     return {
         "status": "success",
         "app_name": config.app_name,
         "host_port": host_port,
         "url": full_url,
-        "message": "App is live and routed."
+        "message": "App is live with SSL encryption!"
     }
 
 def start_daemon(domain: str, port: int = 8000):
