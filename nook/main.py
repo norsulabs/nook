@@ -2,6 +2,7 @@ import typer
 from typing import List
 from nook.server.api import start_daemon
 from nook.client.deploy import push_to_server
+from nook.client.config import save_config
 
 app = typer.Typer(help="nook-cli")
 server_app = typer.Typer(help="Manage the nook Server.")
@@ -11,6 +12,18 @@ app.add_typer(server_app, name="server")
 @server_app.command("start")
 def server_start(port: int = typer.Option(8000, help="Port to run the daemon on")):
     start_daemon(port=port)
+
+
+@app.command()
+def login(
+    url: str = typer.Option("http://localhost:8000", "--url", "-u", help="URL of your VPS daemon")
+):
+    typer.echo(f"Logging into nook daemon at {url}")
+    
+    token = typer.prompt("Paste your API Token", hide_input=True)
+    
+    save_config(token, url)
+    typer.secho("Authentication successful! Config saved.", fg=typer.colors.GREEN)
 
 @app.command("deploy")
 def client_deploy(

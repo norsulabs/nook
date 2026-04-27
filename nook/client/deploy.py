@@ -4,9 +4,13 @@ import shutil
 import tempfile
 import httpx
 import typer
+from nook.client.config import load_config
 
 def push_to_server(app_name: str, subdomain: str, env_vars: dict, server_url: str):
     current_dir = os.getcwd()
+    config = load_config()
+    server_url = config["server_url"]
+    token = config["api_token"]
     
     if not os.path.exists(os.path.join(current_dir, "Dockerfile")):
         typer.secho("Error: No Dockerfile found in current directory.", fg=typer.colors.RED)
@@ -14,6 +18,8 @@ def push_to_server(app_name: str, subdomain: str, env_vars: dict, server_url: st
 
     typer.echo(f"Packaging {app_name}...")
     
+    headers = {"Authorization": f"Bearer {token}"}
+
     with tempfile.TemporaryDirectory() as temp_dir:
         zip_path = os.path.join(temp_dir, "payload")
         shutil.make_archive(zip_path, 'zip', current_dir)
@@ -32,7 +38,7 @@ def push_to_server(app_name: str, subdomain: str, env_vars: dict, server_url: st
             data = {'config_str': json.dumps(config_payload)}
             
             try:
-                response = httpx.post(f"{server_url}/deploy", files=files, data=data, timeout=600.0)
+                response = httpx.post(f"{server_url}/deploy", headers=headers, files=files, data=data, timeout=600.0)
                 response.raise_for_status()
                 
                 result = response.json()
