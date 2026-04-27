@@ -6,9 +6,10 @@ import tempfile
 import socket
 import docker
 import uvicorn
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Dict, Optional, List
+from nook.server.auth import initialize_server_auth, verify_token
 
 app = FastAPI(title="nook-server")
 
@@ -28,7 +29,7 @@ def get_free_port() -> int:
         s.bind(('', 0))
         return s.getsockname()[1]
 
-@app.post("/deploy")
+@app.post("/deploy", dependencies=[Depends(verify_token)])
 async def deploy_app(file: UploadFile = File(...), config_str: str = Form(...)):
     if not docker_client:
          raise HTTPException(status_code=500, detail="Docker engine not available.")
@@ -72,5 +73,6 @@ async def deploy_app(file: UploadFile = File(...), config_str: str = Form(...)):
     return {"status": "success", "app_name": config.app_name, "host_port": host_port}
 
 def start_daemon(port: int = 8000):
+    initialize_server_auth()
     print(f"Starting PaaS Daemon on port {port}...")
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
