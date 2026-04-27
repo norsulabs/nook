@@ -9,7 +9,8 @@ import uvicorn
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Dict, Optional, List
-from nook.server.auth import initialize_server_auth, verify_token
+from nook.server.config import initialize_server, verify_token, get_server_config
+from nook.server.router import update_nginx_config
 
 app = FastAPI(title="nook-server")
 
@@ -21,6 +22,7 @@ except Exception:
 class DeployConfig(BaseModel):
     app_name: str
     subdomain: str
+    app_port: int = 8000
     env_vars: Dict[str, str] = {}
     volumes: Optional[List[str]] = []
 
@@ -60,19 +62,41 @@ async def deploy_app(file: UploadFile = File(...), config_str: str = Form(...)):
 
         host_port = get_free_port()
         print(f"Starting container on port {host_port}...")
-        
+
         container = docker_client.containers.run(
             image=f"{config.app_name}:latest",
             name=config.app_name,
             detach=True,
             environment=config.env_vars,
-            ports={'8000/tcp': host_port}, 
+            ports={f'{config.app_port}/tcp': host_port}, 
             restart_policy={"Name": "always"}
         )
 
-    return {"status": "success", "app_name": config.app_name, "host_port": host_port}
+        try:
+            update_nginx_config(
+                app_name=config.app_name, 
+                subdomain=config.subdomain, 
+                host_port=host_port
+            )
+        except Exception as e:
+            return {
+                "status": "partial_success",
+                "host_port": host_port,
+                "message": f"App is running on port {host_port}, but Nginx routing failed: {str(e)}"
+            }
+            
+    config_obj = get_server_config()
+    full_url = f"http://{config.subdomain}.{config_obj['base_domain']}"
 
-def start_daemon(port: int = 8000):
-    initialize_server_auth()
+    return {
+        "status": "success",
+        "app_name": config.app_name,
+        "host_port": host_port,
+        "url": full_url,
+        "message": "App is live and routed."
+    }
+
+def start_daemon(domain: str, port: int = 8000):
+    initialize_server(domain = domain)
     print(f"Starting PaaS Daemon on port {port}...")
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
