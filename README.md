@@ -19,11 +19,12 @@ Nook is a lightweight, self-hosted Platform as a Service (PaaS) for deploying co
 
 1. Download the latest release from the [releases page](https://github.com/norsulabs/nook/releases)
 2. Install the binary:
+
    ```bash
-    chmod +x nook
     sudo mv nook /usr/local/bin/
     ```
 3. Start the server:
+
    ```bash
     sudo nook server start --domain yourdomain.com
     ```
@@ -31,6 +32,7 @@ Nook is a lightweight, self-hosted Platform as a Service (PaaS) for deploying co
 ### Client
 
 1. Authenticate:
+
     ```bash
      nook login --url http://yourserver:8000
     ```
@@ -42,6 +44,7 @@ Nook is a lightweight, self-hosted Platform as a Service (PaaS) for deploying co
 Navigate to your app directory (must contain a Dockerfile):
 
 Deploy the app:
+
 ```bash
 nook deploy --name myapp --subdomain app --port 80
 ```
