@@ -6,6 +6,7 @@ Nook is a lightweight, self-hosted Platform as a Service (PaaS) for deploying co
 - Automatic reverse proxy configuration with Nginx
 - Automatic SSL certificate provisioning with Let's Encrypt
 - Basic Lifecycle Management (start, stop, restart, delete)
+- Web Dashboard for visual app management
 
 ## Installation
 
@@ -28,16 +29,25 @@ Nook is a lightweight, self-hosted Platform as a Service (PaaS) for deploying co
    ```bash
     sudo nook server start --domain yourdomain.com
     ```
+    
+    *(Note: This will secure an Nginx proxy to the API via `api.yourdomain.com`)*
 
 ### Client
 
 1. Authenticate:
 
     ```bash
-     nook login --url http://yourserver:8000
+     nook login --url https://api.yourdomain.com
     ```
 
 ## Usage
+
+### Web Dashboard
+You can access the built-in web dashboard to manage your deployed applications visually. Once the server is started, navigate to:
+
+**`https://api.yourdomain.com/dashboard`**
+
+Log in using the API token generated during the `nook server start` command.
 
 ### Deploying an App
 
