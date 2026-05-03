@@ -4,90 +4,365 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>nook Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
-</head>
-<body class="bg-light">
-    <div class="container py-5">
-        <div class="card shadow-sm border-0">
-            <div class="card-body p-4">
-                <div class="d-flex justify-content-between align-items-center mb-4 pb-4 border-bottom">
-                    <h1 class="card-title text-primary mb-0 fw-bold">nook Dashboard</h1>
-                    {% if is_authenticated %}
-                        <a href="/dashboard/logout" class="btn btn-outline-danger btn-sm">Logout</a>
-                    {% endif %}
-                </div>
-                
-                {% if error %}
-                    <div class="alert alert-danger" role="alert">{{ error }}</div>
-                {% endif %}
+    <style>
+        body {
+            font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #a8bdd4;
+            background-color: #050b18;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 4rem 2rem;
+            word-wrap: break-word;
+        }
 
-                {% if not is_authenticated %}
-                <form action="/dashboard/login" method="POST" class="mb-4">
-                    <div class="d-flex gap-2 justify-content-center">
-                        <input type="password" name="token" class="form-control w-50" placeholder="Enter API Token" required>
-                        <button type="submit" class="btn btn-primary text-nowrap">Login</button>
-                    </div>
-                </form>
-                {% else %}
-                <div id="apps-container">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h2 class="h4 mb-0 text-secondary">Deployed Applications</h2>
-                        <a href="/dashboard" class="btn btn-outline-secondary btn-sm">Refresh Apps</a>
-                    </div>
-                    
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle border">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Status</th>
-                                    <th>ID</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% if apps|length == 0 %}
-                                <tr><td colspan="4" class="text-center text-muted py-4">No apps deployed yet.</td></tr>
-                                {% else %}
-                                {% for app in apps %}
-                                <tr>
-                                    <td><strong class="text-dark">{{ app.name }}</strong></td>
-                                    <td>
-                                        {% if app.status == 'running' %}
-                                        <span class="badge bg-success rounded-pill px-3">Running</span>
-                                        {% else %}
-                                        <span class="badge bg-danger rounded-pill px-3">Exited</span>
-                                        {% endif %}
-                                    </td>
-                                    <td><span class="text-muted font-monospace small">{{ app.id }}</span></td>
-                                    <td>
-                                        <form action="/dashboard/action" method="POST" class="d-inline">
-                                            <input type="hidden" name="app_name" value="{{ app.name }}">
-                                            {% if app.status == 'running' %}
-                                                <input type="hidden" name="action" value="stop">
-                                                <button type="submit" class="btn btn-warning btn-sm me-1">Stop</button>
-                                            {% else %}
-                                                <input type="hidden" name="action" value="start">
-                                                <button type="submit" class="btn btn-success btn-sm me-1">Start</button>
-                                            {% endif %}
-                                        </form>
-                                        <form action="/dashboard/action" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete {{ app.name }}?');">
-                                            <input type="hidden" name="app_name" value="{{ app.name }}">
-                                            <input type="hidden" name="action" value="delete">
-                                            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
-                                        </form>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                                {% endif %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                {% endif %}
-            </div>
+        header {
+            text-align: left;
+            margin-bottom: 4rem;
+            border: 1px solid #0d1e35;
+            padding: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 2rem;
+            background-color: #070f1f;
+        }
+
+        .lab-info {
+            flex-grow: 1;
+        }
+
+        .lab-title {
+            font-size: 3em;
+            font-weight: 800;
+            text-transform: uppercase;
+            margin-bottom: 0px;
+            color: #e8f0ff;
+            letter-spacing: -1px;
+            line-height: 1;
+        }
+
+        .lab-tagline {
+            font-size: 1em;
+            color: #3a5070;
+            text-transform: lowercase;
+            margin-top: 0.5rem;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .project-card {
+            background-color: #070f1f;
+            border: 1px solid #0d1e35;
+            border-radius: 0;
+            padding: 3rem;
+            margin-top: 2rem;
+            position: relative;
+        }
+
+        .project-header {
+            display: flex;
+            align-items: flex-start;
+            flex-direction: column;
+            margin-bottom: 2rem;
+        }
+
+        .project-badge {
+            background: #4f8ef7;
+            color: #050b18;
+            padding: 2px 8px;
+            border-radius: 0;
+            font-size: 0.7em;
+            font-weight: 800;
+            text-transform: uppercase;
+            margin-top: 1rem;
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+            font-weight: 800;
+            line-height: 1;
+            color: #e8f0ff;
+            text-transform: uppercase;
+        }
+        
+        h1 { font-size: 2.5em; letter-spacing: -2px; }
+        h2 {
+            font-size: 1.2em;
+            border-bottom: 1px solid #0d1e35;
+            padding-bottom: 0.5rem;
+            display: inline-block;
+        }
+        h3 { font-size: 1em; text-decoration: underline; }
+
+        p, ul, ol { margin-top: 0; margin-bottom: 1.5rem; }
+        
+        a {
+            color: #4f8ef7;
+            text-decoration: underline;
+            text-underline-offset: 4px;
+        }
+        a.header-link {
+            text-decoration: none;
+            border: 1px solid #ef4444;
+            color: #ef4444;
+            padding: 0.5rem 1rem;
+            text-transform: uppercase;
+            font-weight: 800;
+            font-size: 0.9em;
+        }
+        a.header-link:hover {
+            background-color: #ef4444;
+            color: #050b18;
+        }
+        a.btn-refresh {
+            border-color: #3a5070;
+            color: #3a5070;
+        }
+        a.btn-refresh:hover {
+            background-color: #3a5070;
+            color: #050b18;
+        }
+        a:hover {
+            background-color: #4f8ef7;
+            color: #050b18;
+        }
+
+        .form-group {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        input[type="password"], input[type="text"] {
+            background-color: #030d1a;
+            border: 1px solid #0d1e35;
+            color: #e8f0ff;
+            padding: 0.75rem;
+            font-family: inherit;
+            width: 300px;
+        }
+        input:focus {
+            outline: none;
+            border-color: #4f8ef7;
+        }
+
+        button, .btn {
+            background-color: #4f8ef7;
+            color: #050b18;
+            border: 1px solid #4f8ef7;
+            padding: 0.75rem 1.5rem;
+            font-family: inherit;
+            font-weight: 800;
+            text-transform: uppercase;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+        button:hover, .btn:hover { background-color: #e8f0ff; border-color: #e8f0ff; color: #050b18; }
+        
+        .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.8em; }
+        .btn-danger { background-color: transparent; border-color: #ef4444; color: #ef4444; }
+        .btn-danger:hover { background-color: #ef4444; color: #050b18; }
+        .btn-warning { background-color: transparent; border-color: #f59e0b; color: #f59e0b; }
+        .btn-warning:hover { background-color: #f59e0b; color: #050b18; }
+        .btn-success { background-color: transparent; border-color: #22c55e; color: #22c55e; }
+        .btn-success:hover { background-color: #22c55e; color: #050b18; }
+
+        .alert-danger {
+            background-color: #1a0505;
+            border: 1px solid #ef4444;
+            color: #fca5a5;
+            padding: 1rem;
+            margin-bottom: 2rem;
+            font-weight: 800;
+        }
+
+        .stats-grid {
+            display: flex;
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+            flex-wrap: wrap;
+        }
+        .stat-box {
+            border: 1px solid #0d1e35;
+            padding: 1.5rem;
+            flex: 1;
+            min-width: 150px;
+            background: #030d1a;
+            text-align: center;
+        }
+        .stat-box h6 {
+            margin: 0 0 0.5rem 0;
+            color: #3a5070;
+            font-size: 0.8em;
+        }
+        .stat-box h2 {
+            margin: 0;
+            border: none;
+            padding: 0;
+            font-size: 2.5em;
+            color: #e8f0ff;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        th, td {
+            text-align: left;
+            padding: 1rem;
+            border-bottom: 1px solid #0d1e35;
+        }
+        th {
+            color: #e8f0ff;
+            border-bottom: 1px solid #4f8ef7;
+        }
+        .app-name { color: #e8f0ff; font-weight: 800; text-decoration: none; }
+        
+        .status-badge {
+            padding: 2px 8px;
+            font-size: 0.75em;
+            font-weight: 800;
+            text-transform: uppercase;
+            border: 1px solid currentColor;
+        }
+        .status-running { color: #22c55e; }
+        .status-exited { color: #ef4444; }
+        
+        .code-text {
+            color: #3a5070;
+            font-family: inherit;
+        }
+
+        .table-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+        .table-actions form { margin: 0; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="lab-info">
+            <div class="lab-title">nook</div>
+            <div class="lab-tagline">dashboard</div>
         </div>
+        <div class="header-actions">
+            {% if is_authenticated %}
+                <a href="/dashboard" class="header-link btn-refresh">Refresh</a>
+                <a href="/dashboard/logout" class="header-link">Logout</a>
+            {% endif %}
+        </div>
+    </header>
+
+    {% if error %}
+        <div class="alert-danger">{{ error }}</div>
+    {% endif %}
+
+    <div class="project-card">
+        
+        {% if not is_authenticated %}
+            <div class="project-header">
+                <h1 style="margin:0; border:none; padding:0;">Login</h1>
+                <span class="project-badge">Authentication Required</span>
+            </div>
+            <p>Access requires the master API token generated during <code>nook server start</code>.</p>
+            <form action="/dashboard/login" method="POST">
+                <div class="form-group">
+                    <input type="password" name="token" placeholder="API Token" required>
+                    <button type="submit">Authenticate</button>
+                </div>
+            </form>
+        {% else %}
+        
+            {% if sys_info %}
+            <h2>System Overview</h2>
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <h6>Applications</h6>
+                    <h2>{{ sys_info.app_count }}</h2>
+                </div>
+                <div class="stat-box (Preview)-box">
+                    <h6>CPUs</h6>
+                    <h2>{{ sys_info.ncpu }}</h2>
+                </div>
+                <div class="stat-box">
+                    <h6>Memory</h6>
+                    <h2>{{ sys_info.mem_total_gb }} <span style="font-size:0.5em;color:#3a5070;">GB</span></h2>
+                </div>
+            </div>
+            {% endif %}
+
+            <h2>Deployed Applications</h2>
+            
+            {% if apps|length == 0 %}
+                <p style="color: #3a5070; margin-top:2rem;">No applications deployed yet.</p>
+            {% else %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Status</th>
+                            <th>ID</th>
+                            <th>URL</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for app in apps %}
+                        <tr>
+                            <td><span class="app-name">{{ app.name }}</span></td>
+                            <td>
+                                {% if app.status == 'running' %}
+                                <span class="status-badge status-running">Running</span>
+                                {% else %}
+                                <span class="status-badge status-exited">Exited</span>
+                                {% endif %}
+                            </td>
+                            <td><span class="code-text">{{ app.id }}</span></td>
+                            <td>
+                                {% if app.url %}
+                                <a href="{{ app.url }}" target="_blank">{{ app.url }}</a>
+                                {% else %}
+                                <span class="code-text">N/A</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="table-actions">
+                                    <form action="/dashboard/action" method="POST">
+                                        <input type="hidden" name="app_name" value="{{ app.name }}">
+                                        {% if app.status == 'running' %}
+                                            <input type="hidden" name="action" value="stop">
+                                            <button type="submit" class="btn btn-sm btn-warning">Stop</button>
+                                        {% else %}
+                                            <input type="hidden" name="action" value="start">
+                                            <button type="submit" class="btn btn-sm btn-success">Start</button>
+                                        {% endif %}
+                                    </form>
+                                    <form action="/dashboard/action" method="POST" onsubmit="return confirm('Are you sure you want to delete {{ app.name }}?');">
+                                        <input type="hidden" name="app_name" value="{{ app.name }}">
+                                        <input type="hidden" name="action" value="delete">
+                                        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+
+        {% endif %}
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
+
 </body>
 </html>

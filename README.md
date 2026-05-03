@@ -73,6 +73,11 @@ Stop an app:
 nook stop myapp
 ```
 
+Refresh/Rotate API Token:
+```bash
+sudo nook server refresh-token
+```
+
 Start an app:
 ```
 nook start myapp

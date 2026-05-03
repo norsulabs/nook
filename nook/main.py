@@ -33,6 +33,20 @@ def server_start(
 
     start_daemon(port=port,domain=domain)
 
+@server_app.command("refresh-token")
+def server_refresh_token():
+    """Generates a new API token and invalidates the old one."""
+    from nook.server.config import generate_new_token
+
+    if typer.confirm("Are you sure you want to generate a new API token? This will invalidate the old one."):
+        raw_token = generate_new_token()
+        if not raw_token:
+            typer.secho("Error: Server not initialized. Run `nook server start` first.", fg=typer.colors.RED)
+            raise typer.Exit(1)
+            
+        typer.secho(f"\nNEW TOKEN GENERATED", fg=typer.colors.CYAN, bold=True)
+        typer.echo(f"API Token: {raw_token}")
+        typer.secho("Save this token! It will not be shown again.\n", fg=typer.colors.YELLOW)
 
 @app.command()
 def login(

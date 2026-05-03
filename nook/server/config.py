@@ -34,6 +34,21 @@ def initialize_server(domain: str):
 
     return raw_token
 
+def generate_new_token():
+    config_data = get_server_config()
+    if not config_data:
+        return None
+
+    raw_token = secrets.token_hex(32)
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+    
+    config_data["token_hash"] = token_hash
+
+    with open(CONFIG_FILE, "w") as f:
+        json.dump(config_data, f)
+
+    return raw_token
+
 def verify_token(credentials: HTTPAuthorizationCredentials = Security(security)):
     config = get_server_config()
     if not config:

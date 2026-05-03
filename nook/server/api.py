@@ -10,17 +10,29 @@ import secrets
 import hashlib
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from contextlib import asynccontextmanager
 from pydantic import BaseModel
 from typing import Dict, Optional, List
 from nook.server.config import initialize_server, verify_token, get_server_config
 from nook.server.router import update_nginx_config
 
-app = FastAPI(title="nook-server")
-
 try:
     docker_client = docker.from_env()
 except Exception:
     docker_client = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup logic
+    yield
+    # Shutdown logic
+    if docker_client:
+        try:
+            docker_client.close()
+        except Exception:
+            pass
+
+app = FastAPI(title="nook-server", lifespan=lifespan)
 
 class DeployConfig(BaseModel):
     app_name: str
@@ -170,14 +182,29 @@ async def dashboard_view(request: Request):
             if secrets.compare_digest(incoming_hash, config["token_hash"]):
                 is_authenticated = True
                 
+    sys_info = {}
     if is_authenticated and docker_client:
         containers = docker_client.containers.list(all=True, filters={"label": "managed_by=nook"})
+        config_data = get_server_config()
+        base_domain = config_data.get("base_domain", "") if config_data else ""
+        
         for c in containers:
             apps.append({
                 "name": c.name,
                 "status": c.status,
-                "id": c.short_id
+                "id": c.short_id,
+                "url": f"https://{c.name}.{base_domain}" if base_domain else ""
             })
+            
+        try:
+            info = docker_client.info()
+            sys_info = {
+                "app_count": len(apps),
+                "ncpu": info.get("NCPU", 0),
+                "mem_total_gb": round(info.get("MemTotal", 0) / (1024**3), 2)
+            }
+        except Exception:
+            pass
             
     return templates.TemplateResponse(
         request=request,
@@ -186,7 +213,8 @@ async def dashboard_view(request: Request):
             "request": request, 
             "is_authenticated": is_authenticated, 
             "apps": apps,
-            "error": error
+            "error": error,
+            "sys_info": sys_info
         }
     )
 
@@ -248,4 +276,7 @@ def start_daemon(domain: str, port: int = 8000):
         print(f"Failed to setup Nginx/SSL for API: {e}")
         
     print(f"Starting PaaS Daemon locally on port {port}...")
-    uvicorn.run(app, host="127.0.0.1", port=port, log_level="info")
+    try:
+        uvicorn.run(app, host="127.0.0.1", port=port, log_level="info")
+    except (KeyboardInterrupt, SystemExit):
+        pass
