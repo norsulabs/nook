@@ -239,5 +239,13 @@ async def dashboard_action(request: Request, app_name: str = Form(...), action: 
 
 def start_daemon(domain: str, port: int = 8000):
     initialize_server(domain = domain)
-    print(f"Starting PaaS Daemon on port {port}...")
-    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
+    
+    from nook.server.router import update_nginx_config, provision_ssl
+    try:
+        update_nginx_config(app_name="nook-api", subdomain="api", host_port=port)
+        provision_ssl("api")
+    except Exception as e:
+        print(f"Failed to setup Nginx/SSL for API: {e}")
+        
+    print(f"Starting PaaS Daemon locally on port {port}...")
+    uvicorn.run(app, host="127.0.0.1", port=port, log_level="info")
