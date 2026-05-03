@@ -6,7 +6,10 @@ import tempfile
 import socket
 import docker
 import uvicorn
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends
+import secrets
+import hashlib
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 from typing import Dict, Optional, List
 from nook.server.config import initialize_server, verify_token, get_server_config
@@ -143,6 +146,96 @@ async def delete_app(name: str):
         return {"status": "success", "message": f"App {name} removed completely."}
     except docker.errors.NotFound:
         raise HTTPException(status_code=404, detail="App not found")
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard_view(request: Request):
+    import sys
+    if getattr(sys, 'frozen', False):
+        template_dir = os.path.join(sys._MEIPASS, "nook", "server")
+    else:
+        template_dir = os.path.dirname(__file__)
+        
+    from fastapi.templating import Jinja2Templates
+    templates = Jinja2Templates(directory=template_dir)
+    
+    is_authenticated = False
+    apps = []
+    error = request.query_params.get("error")
+    
+    token = request.cookies.get("nook_token")
+    if token:
+        config = get_server_config()
+        if config:
+            incoming_hash = hashlib.sha256(token.encode()).hexdigest()
+            if secrets.compare_digest(incoming_hash, config["token_hash"]):
+                is_authenticated = True
+                
+    if is_authenticated and docker_client:
+        containers = docker_client.containers.list(all=True, filters={"label": "managed_by=nook"})
+        for c in containers:
+            apps.append({
+                "name": c.name,
+                "status": c.status,
+                "id": c.short_id
+            })
+            
+    return templates.TemplateResponse(
+        request=request,
+        name="dashboard.html", 
+        context={
+            "request": request, 
+            "is_authenticated": is_authenticated, 
+            "apps": apps,
+            "error": error
+        }
+    )
+
+@app.post("/dashboard/login")
+async def dashboard_login(token: str = Form(...)):
+    config = get_server_config()
+    if not config:
+        return RedirectResponse(url="/dashboard?error=Server+not+initialized", status_code=303)
+        
+    incoming_hash = hashlib.sha256(token.encode()).hexdigest()
+    if not secrets.compare_digest(incoming_hash, config["token_hash"]):
+        return RedirectResponse(url="/dashboard?error=Invalid+token", status_code=303)
+        
+    response = RedirectResponse(url="/dashboard", status_code=303)
+    response.set_cookie(key="nook_token", value=token, httponly=True)
+    return response
+
+@app.get("/dashboard/logout")
+async def dashboard_logout():
+    response = RedirectResponse(url="/dashboard", status_code=303)
+    response.delete_cookie("nook_token")
+    return response
+
+@app.post("/dashboard/action")
+async def dashboard_action(request: Request, app_name: str = Form(...), action: str = Form(...)):
+    token = request.cookies.get("nook_token")
+    config = get_server_config()
+    if not token or not config:
+        return RedirectResponse(url="/dashboard", status_code=303)
+        
+    incoming_hash = hashlib.sha256(token.encode()).hexdigest()
+    if not secrets.compare_digest(incoming_hash, config["token_hash"]):
+        return RedirectResponse(url="/dashboard", status_code=303)
+        
+    try:
+        container = docker_client.containers.get(app_name)
+        if action == "start":
+            container.start()
+        elif action == "stop":
+            container.stop()
+        elif action == "delete":
+            container.stop()
+            container.remove()
+            from nook.server.router import remove_nginx_config
+            remove_nginx_config(app_name)
+    except Exception as e:
+        pass
+        
+    return RedirectResponse(url="/dashboard", status_code=303)
 
 def start_daemon(domain: str, port: int = 8000):
     initialize_server(domain = domain)

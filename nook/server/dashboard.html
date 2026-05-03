@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>nook Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
+</head>
+<body class="bg-light">
+    <div class="container py-5">
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-4 pb-4 border-bottom">
+                    <h1 class="card-title text-primary mb-0 fw-bold">nook Dashboard</h1>
+                    {% if is_authenticated %}
+                        <a href="/dashboard/logout" class="btn btn-outline-danger btn-sm">Logout</a>
+                    {% endif %}
+                </div>
+                
+                {% if error %}
+                    <div class="alert alert-danger" role="alert">{{ error }}</div>
+                {% endif %}
+
+                {% if not is_authenticated %}
+                <form action="/dashboard/login" method="POST" class="mb-4">
+                    <div class="d-flex gap-2 justify-content-center">
+                        <input type="password" name="token" class="form-control w-50" placeholder="Enter API Token" required>
+                        <button type="submit" class="btn btn-primary text-nowrap">Login</button>
+                    </div>
+                </form>
+                {% else %}
+                <div id="apps-container">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h2 class="h4 mb-0 text-secondary">Deployed Applications</h2>
+                        <a href="/dashboard" class="btn btn-outline-secondary btn-sm">Refresh Apps</a>
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle border">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Status</th>
+                                    <th>ID</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if apps|length == 0 %}
+                                <tr><td colspan="4" class="text-center text-muted py-4">No apps deployed yet.</td></tr>
+                                {% else %}
+                                {% for app in apps %}
+                                <tr>
+                                    <td><strong class="text-dark">{{ app.name }}</strong></td>
+                                    <td>
+                                        {% if app.status == 'running' %}
+                                        <span class="badge bg-success rounded-pill px-3">Running</span>
+                                        {% else %}
+                                        <span class="badge bg-danger rounded-pill px-3">Exited</span>
+                                        {% endif %}
+                                    </td>
+                                    <td><span class="text-muted font-monospace small">{{ app.id }}</span></td>
+                                    <td>
+                                        <form action="/dashboard/action" method="POST" class="d-inline">
+                                            <input type="hidden" name="app_name" value="{{ app.name }}">
+                                            {% if app.status == 'running' %}
+                                                <input type="hidden" name="action" value="stop">
+                                                <button type="submit" class="btn btn-warning btn-sm me-1">Stop</button>
+                                            {% else %}
+                                                <input type="hidden" name="action" value="start">
+                                                <button type="submit" class="btn btn-success btn-sm me-1">Start</button>
+                                            {% endif %}
+                                        </form>
+                                        <form action="/dashboard/action" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete {{ app.name }}?');">
+                                            <input type="hidden" name="app_name" value="{{ app.name }}">
+                                            <input type="hidden" name="action" value="delete">
+                                            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
+</body>
+</html>
