@@ -65,9 +65,30 @@ def client_deploy(
     subdomain: str = typer.Option(..., "--subdomain", "-s", help="Subdomain for routing"),
     app_port: int = typer.Option(8000, "--port", "-p", help="Port the application exposes internally"),
     env: List[str] = typer.Option([], "-e", "--env", help="Environment variables (e.g. -e KEY=VAL)"),
+    env_file: str = typer.Option(None, "--env-file", help="Path to a .env file to load environment variables from"),
     daemon_url: str = typer.Option("http://localhost:8000", help="URL of your VPS daemon")
 ):
-    env_dict = dict(e.split("=", 1) for e in env)
+    env_dict = {}
+    
+    if env_file:
+        import os
+        if not os.path.exists(env_file):
+            typer.secho(f"Error: Environment file '{env_file}' not found.", fg=typer.colors.RED)
+            raise typer.Exit(1)
+        with open(env_file, "r") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    if "=" in line:
+                        k, v = line.split("=", 1)
+                        v = v.strip('\n\'"')
+                        env_dict[k.strip()] = v
+
+    for e in env:
+        if "=" in e:
+            k, v = e.split("=", 1)
+            env_dict[k.strip()] = v.strip()
+
     push_to_server(app_name=name, subdomain=subdomain, app_port=app_port, env_vars=env_dict, server_url=daemon_url)
 
 
