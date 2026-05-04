@@ -59,6 +59,17 @@ Deploy the app:
 nook deploy --name myapp --subdomain app --port 80
 ```
 
+#### Environment Variables
+You can pass environment variables to your application during deployment:
+
+```bash
+# Using individual flags
+nook deploy --name myapp --subdomain app --port 80 -e KEY1=VAL1 -e KEY2=VAL2
+
+# Using a .env file
+nook deploy --name myapp --subdomain app --port 80 --env-file .env
+```
+
 Upon successful deployment, your app will be accessible at `https://app.yourdomain.com`.
 
 ### Managing Apps
